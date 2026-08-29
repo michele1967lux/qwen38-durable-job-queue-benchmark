@@ -65,7 +65,11 @@ before the core, that every commit hash cited in the documents exists, and
 that the single commit modifying tests **strengthened** its assertions rather
 than weakening them.
 
-The judged branch and tag are not to be rewritten.
+The judged branch and tag are not to be rewritten — and this is now enforced
+technically, not just by convention. A repository ruleset blocks deletion and
+update of `benchmark-submission-*` tags, and blocks deletion and force-push on
+`bench/qwen38-durable-job-queue`. Both were verified by attempting them: the
+pushes were rejected.
 
 ## License
 
