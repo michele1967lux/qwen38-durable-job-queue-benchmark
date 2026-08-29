@@ -59,7 +59,7 @@ def test_cli_worker_processes_job(tmp_path: Path):
 
     r = run_cli(
         ["worker", "--db", str(db), "--worker-id", "cli-w",
-         "--max-jobs", "1"],
+         "--handler", "write-file", "--max-jobs", "1"],
         tmp_path,
     )
     assert r.returncode == 0, r.stderr
@@ -71,7 +71,12 @@ def test_cli_worker_processes_job(tmp_path: Path):
 
 
 def test_cli_worker_retry_then_dead(tmp_path: Path):
-    """A failing job is retried and eventually dead (visible via CLI)."""
+    """A failing job is retried and eventually dead (visible via CLI).
+
+    The worker exits via --idle-polls (no more claimable jobs). Backoff is
+    1s then 2s (real clock), so poll-seconds must exceed the backoff for
+    the job to become claimable again on the next pass.
+    """
     db = tmp_path / "cli-dead.db"
 
     r = run_cli(
@@ -82,13 +87,13 @@ def test_cli_worker_retry_then_dead(tmp_path: Path):
     assert r.returncode == 0, r.stderr
     job_id = r.stdout.strip().splitlines()[-1]
 
-    # Two worker passes: each claims the job once (backoff is 1s/2s;
-    # the CLI worker uses a real clock, so we pass --lease-seconds and
-    # rely on the worker loop sleeping past backoff via --poll-seconds).
+    # Pass 1: claims the job (attempt 1), it fails, backoff 1s.
+    # Pass 2: after backoff, claims again (attempt 2), fails -> dead.
     for i in range(2):
         r = run_cli(
             ["worker", "--db", str(db), "--worker-id", f"w{i}",
-             "--max-jobs", "1", "--poll-seconds", "3"],
+             "--handler", "always-fail",
+             "--poll-seconds", "1.5", "--idle-polls", "2"],
             tmp_path,
         )
         assert r.returncode == 0, r.stderr

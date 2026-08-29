@@ -52,20 +52,22 @@ def test_recover_re_pends_expired_running_jobs(db_path, clock):
 
 def test_recover_does_not_touch_valid_leases(db_path, clock):
     q = JobQueue(str(db_path), clock=clock)
-    j1 = q.enqueue(job_type="echo", payload={})
-    j2 = q.enqueue(job_type="echo", payload={})
-    q.claim(worker_id="alive", lease_seconds=100)
-    q.claim(worker_id="dead", lease_seconds=1)
+    j1 = q.enqueue(job_type="echo", payload={"n": 1})
+    j2 = q.enqueue(job_type="echo", payload={"n": 2})
+    c1 = q.claim(worker_id="alive", lease_seconds=100)
+    c2 = q.claim(worker_id="dead", lease_seconds=1)
+    assert {c1.id, c2.id} == {j1.id, j2.id}
+    # Identify which claim holds the short (expiring) lease.
+    short = c2 if c2.lease_until < c1.lease_until else c1
+    long = c1 if short is c2 else c2
 
     clock.advance(2)
     recovered = q.recover()
     assert recovered == 1
 
-    s1 = q.get(j1.id)
-    assert s1.status.value == "running"  # valid lease untouched
-    assert s1.worker_id == "alive"
-    s2 = q.get(j2.id)
-    assert s2.status.value == "pending"
+    # The valid lease is untouched; the expired one is re-pended.
+    assert q.get(long.id).status.value == "running"
+    assert q.get(short.id).status.value == "pending"
     q.close()
 
 

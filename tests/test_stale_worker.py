@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from durable_job_queue import JobQueue, LeaseLost
+from durable_job_queue import InvalidStateTransition, JobQueue, LeaseLost
 
 
 def test_stale_worker_cannot_complete(db_path, clock):
@@ -51,9 +51,16 @@ def test_stale_worker_cannot_complete(db_path, clock):
     assert b_done.status.value == "completed"
     assert b_done.worker_id == "worker-B"
 
-    # A still cannot fail it either (I3: stale worker cannot overwrite).
-    with pytest.raises(LeaseLost):
+    # A still cannot fail it: the job is now completed (terminal), so the
+    # precise error is InvalidStateTransition. (While the job was still
+    # running under B's lease, A's stale token raised LeaseLost — proven
+    # above. I3 holds either way: A cannot overwrite B's outcome.)
+    with pytest.raises(InvalidStateTransition):
         q_a.fail(job.id, token=a_token, error="late failure")
+
+    final = q_b.get(job.id)
+    assert final.status.value == "completed"
+    assert final.worker_id == "worker-B"
 
     q_a.close()
     q_b.close()
