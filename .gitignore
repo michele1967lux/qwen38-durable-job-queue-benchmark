@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# SQLite databases and WAL side files
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# Test / tooling artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# OS
+.DS_Store
